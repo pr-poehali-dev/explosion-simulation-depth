@@ -27,6 +27,8 @@ export default function Index() {
   const [isExploding, setIsExploding] = useState(false);
   const [wells, setWells] = useState<Well[]>([]);
   const [currentDelay, setCurrentDelay] = useState(0);
+  const [selectedWell, setSelectedWell] = useState<number | null>(null);
+  const [editingDelay, setEditingDelay] = useState<string>('');
 
   useEffect(() => {
     generateWells();
@@ -91,6 +93,27 @@ export default function Index() {
     setIsExploding(false);
     setCurrentDelay(0);
     setWells(wells.map(w => ({ ...w, exploded: false })));
+  };
+
+  const handleWellClick = (wellId: number) => {
+    if (isExploding) return;
+    const well = wells.find(w => w.id === wellId);
+    if (well) {
+      setSelectedWell(wellId);
+      setEditingDelay(well.delay.toString());
+    }
+  };
+
+  const updateWellDelay = (wellId: number, newDelay: number) => {
+    setWells(wells.map(w => 
+      w.id === wellId ? { ...w, delay: newDelay } : w
+    ));
+    setSelectedWell(null);
+    setEditingDelay('');
+  };
+
+  const applyDelayToAll = () => {
+    generateWells();
   };
 
   const exportToPDF = () => {
@@ -236,9 +259,20 @@ ${'='.repeat(50)}
                 </div>
 
                 <div>
-                  <Label className="text-foreground mb-2 block">
-                    Замедление между скважинами: {delay} мс
-                  </Label>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="text-foreground">
+                      Замедление между скважинами: {delay} мс
+                    </Label>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={applyDelayToAll}
+                      className="h-7 text-xs"
+                    >
+                      <Icon name="RefreshCw" size={14} className="mr-1" />
+                      Применить
+                    </Button>
+                  </div>
                   <Slider
                     value={[delay]}
                     onValueChange={(v) => setDelay(v[0])}
@@ -247,6 +281,9 @@ ${'='.repeat(50)}
                     step={5}
                     className="w-full"
                   />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    💡 Кликните по скважине на схеме, чтобы задать индивидуальное замедление
+                  </p>
                 </div>
               </div>
             </Card>
@@ -355,6 +392,7 @@ ${'='.repeat(50)}
                   {wells.map((well) => {
                     const exploding = well.exploded && isExploding;
                     const willExplode = well.delay <= currentDelay + 200 && well.delay > currentDelay - 200;
+                    const isSelected = selectedWell === well.id;
                     
                     return (
                       <g key={well.id}>
@@ -378,14 +416,28 @@ ${'='.repeat(50)}
                           </>
                         )}
                         
+                        {isSelected && !isExploding && (
+                          <circle
+                            cx={well.x}
+                            cy={well.y}
+                            r={wellSpacing * 0.5}
+                            fill="none"
+                            stroke="#8B5CF6"
+                            strokeWidth={0.15}
+                            className="animate-pulse"
+                          />
+                        )}
+                        
                         <circle
                           cx={well.x}
                           cy={well.y}
                           r={wellSpacing * 0.25}
-                          fill={exploding ? '#F97316' : willExplode ? '#0EA5E9' : '#6366f1'}
-                          stroke={exploding ? '#FFF' : '#0EA5E9'}
+                          fill={exploding ? '#F97316' : isSelected ? '#8B5CF6' : willExplode ? '#0EA5E9' : '#6366f1'}
+                          stroke={exploding ? '#FFF' : isSelected ? '#8B5CF6' : '#0EA5E9'}
                           strokeWidth={0.2}
-                          className={willExplode && !exploding ? 'animate-pulse' : ''}
+                          className={`${willExplode && !exploding ? 'animate-pulse' : ''} ${!isExploding ? 'cursor-pointer' : ''}`}
+                          onClick={() => handleWellClick(well.id)}
+                          style={{ pointerEvents: isExploding ? 'none' : 'all' }}
                         />
                         
                         <text
@@ -393,8 +445,9 @@ ${'='.repeat(50)}
                           y={well.y - wellSpacing * 0.4}
                           textAnchor="middle"
                           fontSize={wellSpacing * 0.3}
-                          fill="#94a3b8"
+                          fill={isSelected ? '#8B5CF6' : '#94a3b8'}
                           fontFamily="monospace"
+                          fontWeight={isSelected ? 'bold' : 'normal'}
                         >
                           {well.delay}мс
                         </text>
@@ -673,8 +726,60 @@ ${'='.repeat(50)}
                   <div className="w-6 h-6 rounded-full bg-accent" />
                   <span className="text-muted-foreground">Детонация</span>
                 </div>
+                
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 rounded-full bg-primary border-2 border-primary animate-pulse" />
+                  <span className="text-muted-foreground">Выбрана для редактирования</span>
+                </div>
               </div>
             </Card>
+            
+            {selectedWell !== null && !isExploding && (
+              <Card className="p-6 bg-card border-border border-primary">
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                  <Icon name="Edit" size={24} className="text-primary" />
+                  Редактирование замедления
+                </h2>
+                
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-foreground mb-2 block">
+                      Скважина №{selectedWell + 1} - новое замедление (мс)
+                    </Label>
+                    <Input
+                      type="number"
+                      value={editingDelay}
+                      onChange={(e) => setEditingDelay(e.target.value)}
+                      placeholder="Введите замедление"
+                      className="bg-input border-border"
+                      autoFocus
+                    />
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => updateWellDelay(selectedWell, Number(editingDelay))}
+                      disabled={!editingDelay || isNaN(Number(editingDelay))}
+                      className="flex-1 bg-primary hover:bg-primary/90"
+                    >
+                      <Icon name="Check" size={18} className="mr-2" />
+                      Применить
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setSelectedWell(null);
+                        setEditingDelay('');
+                      }}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      <Icon name="X" size={18} className="mr-2" />
+                      Отмена
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )}
           </div>
         </div>
       </div>
