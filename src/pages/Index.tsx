@@ -5,6 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import Icon from '@/components/ui/icon';
 
 interface Well {
@@ -114,6 +120,62 @@ export default function Index() {
 
   const applyDelayToAll = () => {
     generateWells();
+  };
+
+  const applyPattern = (pattern: 'sequential' | 'diagonal' | 'rows' | 'snake' | 'vshape' | 'center') => {
+    const updatedWells = [...wells];
+    
+    switch (pattern) {
+      case 'sequential':
+        updatedWells.forEach((well, idx) => {
+          well.delay = idx * delay;
+        });
+        break;
+        
+      case 'diagonal':
+        updatedWells.forEach(well => {
+          well.delay = (well.row + well.col) * delay;
+        });
+        break;
+        
+      case 'rows':
+        updatedWells.forEach(well => {
+          well.delay = well.row * delay * cols + well.col * delay;
+        });
+        break;
+        
+      case 'snake':
+        updatedWells.forEach(well => {
+          if (well.row % 2 === 0) {
+            well.delay = (well.row * cols + well.col) * delay;
+          } else {
+            well.delay = (well.row * cols + (cols - 1 - well.col)) * delay;
+          }
+        });
+        break;
+        
+      case 'vshape':
+        updatedWells.forEach(well => {
+          const middleCol = Math.floor(cols / 2);
+          const distFromMiddle = Math.abs(well.col - middleCol);
+          well.delay = (well.row * delay * 2) + (distFromMiddle * delay);
+        });
+        break;
+        
+      case 'center':
+        const centerRow = Math.floor(rows / 2);
+        const centerCol = Math.floor(cols / 2);
+        updatedWells.forEach(well => {
+          const distance = Math.sqrt(
+            Math.pow(well.row - centerRow, 2) + 
+            Math.pow(well.col - centerCol, 2)
+          );
+          well.delay = Math.round(distance * delay * 2);
+        });
+        break;
+    }
+    
+    setWells(updatedWells);
   };
 
   const exportToPDF = () => {
@@ -281,9 +343,60 @@ ${'='.repeat(50)}
                     step={5}
                     className="w-full"
                   />
-                  <p className="text-xs text-muted-foreground mt-2">
-                    💡 Кликните по скважине на схеме, чтобы задать индивидуальное замедление
-                  </p>
+                  <div className="flex items-center justify-between mt-3">
+                    <p className="text-xs text-muted-foreground">
+                      💡 Кликните по скважине на схеме для редактирования
+                    </p>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs"
+                        >
+                          <Icon name="Wand2" size={14} className="mr-1" />
+                          Шаблоны
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuItem onClick={() => applyPattern('sequential')}>
+                          <Icon name="ArrowRight" size={16} className="mr-2" />
+                          <div>
+                            <div className="font-medium">Последовательный</div>
+                            <div className="text-xs text-muted-foreground">Ряд за рядом →</div>
+                          </div>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => applyPattern('diagonal')}>
+                          <Icon name="Slash" size={16} className="mr-2" />
+                          <div>
+                            <div className="font-medium">Диагональный</div>
+                            <div className="text-xs text-muted-foreground">По диагонали ↘</div>
+                          </div>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => applyPattern('snake')}>
+                          <Icon name="Waves" size={16} className="mr-2" />
+                          <div>
+                            <div className="font-medium">Змейка</div>
+                            <div className="text-xs text-muted-foreground">Зигзагом ⤵</div>
+                          </div>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => applyPattern('vshape')}>
+                          <Icon name="ChevronDown" size={16} className="mr-2" />
+                          <div>
+                            <div className="font-medium">V-образный</div>
+                            <div className="text-xs text-muted-foreground">От центра в стороны</div>
+                          </div>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => applyPattern('center')}>
+                          <Icon name="Circle" size={16} className="mr-2" />
+                          <div>
+                            <div className="font-medium">От центра</div>
+                            <div className="text-xs text-muted-foreground">Круговая волна</div>
+                          </div>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
               </div>
             </Card>
