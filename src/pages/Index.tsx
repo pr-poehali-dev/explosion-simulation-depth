@@ -4,6 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
 
 interface Well {
@@ -90,6 +91,46 @@ export default function Index() {
     setIsExploding(false);
     setCurrentDelay(0);
     setWells(wells.map(w => ({ ...w, exploded: false })));
+  };
+
+  const exportToPDF = () => {
+    const content = `
+ОТЧЕТ ПО ВЗРЫВНЫМ РАБОТАМ
+${'='.repeat(50)}
+
+ПАРАМЕТРЫ СКВАЖИН:
+- Глубина скважин: ${depth} м
+- Расстояние между скважинами: ${wellSpacing} м
+- Расстояние между рядами: ${rowSpacing} м
+- Количество рядов: ${rows}
+- Скважин в ряду: ${cols}
+- Замедление между скважинами: ${delay} мс
+
+РАСЧЕТНЫЕ ДАННЫЕ:
+- Всего скважин: ${totalWells}
+- Общий расход ВВ: ${totalExplosiveWeight} кг
+- Длительность взрыва: ${totalTime} сек
+- Площадь покрытия: ${((rows - 1) * rowSpacing * (cols - 1) * wellSpacing).toFixed(0)} м²
+
+ТАБЛИЦА ЗАМЕДЛЕНИЙ:
+${'='.repeat(50)}
+Ряд | Скважина | Замедление (мс)
+${'-'.repeat(50)}
+${wells.map(w => `${w.row + 1}    | ${w.col + 1}        | ${w.delay}`).join('\n')}
+${'='.repeat(50)}
+
+Дата формирования: ${new Date().toLocaleDateString('ru-RU')}
+    `;
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `blast_report_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const totalWells = rows * cols;
@@ -240,21 +281,31 @@ export default function Index() {
                 </div>
               </div>
 
-              <div className="mt-6 flex gap-3">
+              <div className="mt-6 space-y-3">
+                <div className="flex gap-3">
+                  <Button 
+                    onClick={startBlast} 
+                    disabled={isExploding}
+                    className="flex-1 bg-accent hover:bg-accent/90 text-accent-foreground"
+                  >
+                    <Icon name="Zap" size={20} className="mr-2" />
+                    Начать взрыв
+                  </Button>
+                  <Button 
+                    onClick={resetBlast}
+                    variant="outline"
+                    className="border-border"
+                  >
+                    <Icon name="RotateCcw" size={20} />
+                  </Button>
+                </div>
                 <Button 
-                  onClick={startBlast} 
-                  disabled={isExploding}
-                  className="flex-1 bg-accent hover:bg-accent/90 text-accent-foreground"
+                  onClick={exportToPDF}
+                  variant="secondary"
+                  className="w-full"
                 >
-                  <Icon name="Zap" size={20} className="mr-2" />
-                  Начать взрыв
-                </Button>
-                <Button 
-                  onClick={resetBlast}
-                  variant="outline"
-                  className="border-border"
-                >
-                  <Icon name="RotateCcw" size={20} />
+                  <Icon name="Download" size={20} className="mr-2" />
+                  Экспорт расчетов
                 </Button>
               </div>
             </Card>
@@ -262,10 +313,23 @@ export default function Index() {
 
           <div className="space-y-6">
             <Card className="p-6 bg-card border-border">
-              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                <Icon name="Grid3x3" size={24} className="text-secondary" />
-                Схема расположения скважин
-              </h2>
+              <Tabs defaultValue="plan" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-4">
+                  <TabsTrigger value="plan" className="flex items-center gap-2">
+                    <Icon name="Grid3x3" size={18} />
+                    План
+                  </TabsTrigger>
+                  <TabsTrigger value="profile" className="flex items-center gap-2">
+                    <Icon name="Layers" size={18} />
+                    Профиль
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="plan" className="mt-0">
+                  <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                    <Icon name="Grid3x3" size={24} className="text-secondary" />
+                    Схема расположения скважин
+                  </h2>
               
               <div 
                 className="relative bg-muted/30 rounded-lg border border-border"
@@ -398,6 +462,194 @@ export default function Index() {
                   </div>
                 </div>
               )}
+                </TabsContent>
+
+                <TabsContent value="profile" className="mt-0">
+                  <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                    <Icon name="Layers" size={24} className="text-secondary" />
+                    3D профиль скважин
+                  </h2>
+                  
+                  <div 
+                    className="relative bg-muted/30 rounded-lg border border-border"
+                    style={{ 
+                      width: '100%', 
+                      paddingBottom: '80%',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    <svg
+                      className="absolute inset-0 w-full h-full"
+                      viewBox={`0 -5 ${gridWidth + wellSpacing * 2} ${depth + 5}`}
+                      preserveAspectRatio="xMidYMid meet"
+                    >
+                      <defs>
+                        <linearGradient id="groundGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" stopColor="#64748b" stopOpacity="0.3" />
+                          <stop offset="100%" stopColor="#334155" stopOpacity="0.6" />
+                        </linearGradient>
+                        <linearGradient id="wellGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" stopColor="#8B5CF6" stopOpacity="0.8" />
+                          <stop offset="100%" stopColor="#6366f1" stopOpacity="0.9" />
+                        </linearGradient>
+                      </defs>
+
+                      <rect x="0" y="0" width={gridWidth + wellSpacing * 2} height={depth} fill="url(#groundGradient)" />
+
+                      <line x1="0" y1="0" x2={gridWidth + wellSpacing * 2} y2="0" stroke="#94a3b8" strokeWidth="0.2" strokeDasharray="0.5,0.5" />
+
+                      {Array.from({ length: Math.floor(depth / 2) + 1 }, (_, i) => i * 2).map(d => (
+                        <g key={`depth-${d}`}>
+                          <line 
+                            x1="0" 
+                            y1={d} 
+                            x2={gridWidth + wellSpacing * 2} 
+                            y2={d} 
+                            stroke="#475569" 
+                            strokeWidth="0.1" 
+                            strokeDasharray="0.3,0.3" 
+                            opacity="0.5"
+                          />
+                          <text 
+                            x="0.5" 
+                            y={d + 0.3} 
+                            fontSize="0.6" 
+                            fill="#94a3b8" 
+                            fontFamily="monospace"
+                          >
+                            {d}м
+                          </text>
+                        </g>
+                      ))}
+
+                      {wells.filter(w => w.row === 0).map((well) => {
+                        const exploding = well.exploded && isExploding;
+                        const x = well.x + wellSpacing;
+                        
+                        return (
+                          <g key={well.id}>
+                            <rect
+                              x={x - 0.3}
+                              y={0}
+                              width={0.6}
+                              height={depth}
+                              fill="url(#wellGradient)"
+                              stroke={exploding ? '#F97316' : '#0EA5E9'}
+                              strokeWidth="0.1"
+                              opacity={exploding ? 1 : 0.7}
+                            />
+
+                            {exploding && (
+                              <>
+                                <circle
+                                  cx={x}
+                                  cy={depth}
+                                  r={1.5}
+                                  fill="#F97316"
+                                  opacity="0.6"
+                                  className="animate-ping"
+                                  style={{ animationDuration: '0.8s' }}
+                                />
+                                <circle
+                                  cx={x}
+                                  cy={depth}
+                                  r={0.8}
+                                  fill="#F97316"
+                                  opacity="0.9"
+                                />
+                              </>
+                            )}
+
+                            <circle
+                              cx={x}
+                              cy={depth}
+                              r={0.4}
+                              fill={exploding ? '#FFF' : '#0EA5E9'}
+                              stroke={exploding ? '#F97316' : '#6366f1'}
+                              strokeWidth="0.15"
+                            />
+
+                            <text
+                              x={x}
+                              y={-0.5}
+                              textAnchor="middle"
+                              fontSize="0.7"
+                              fill="#cbd5e1"
+                              fontFamily="monospace"
+                              fontWeight="bold"
+                            >
+                              №{well.col + 1}
+                            </text>
+
+                            <text
+                              x={x}
+                              y={depth + 1.5}
+                              textAnchor="middle"
+                              fontSize="0.6"
+                              fill="#94a3b8"
+                              fontFamily="monospace"
+                            >
+                              {well.delay}мс
+                            </text>
+
+                            {[...Array(Math.floor(depth / 3))].map((_, i) => (
+                              <rect
+                                key={`charge-${i}`}
+                                x={x - 0.5}
+                                y={depth * 0.7 + i * 1}
+                                width={1}
+                                height={0.6}
+                                fill="#ef4444"
+                                opacity="0.7"
+                                rx="0.1"
+                              />
+                            ))}
+                          </g>
+                        );
+                      })}
+
+                      <text
+                        x={wellSpacing / 2}
+                        y={depth / 2}
+                        fontSize="0.8"
+                        fill="#64748b"
+                        fontFamily="monospace"
+                        transform={`rotate(-90 ${wellSpacing / 2} ${depth / 2})`}
+                      >
+                        Глубина: {depth}м
+                      </text>
+                    </svg>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="w-4 h-4 bg-gradient-to-b from-[#8B5CF6] to-[#6366f1] rounded" />
+                      <span className="text-muted-foreground">Ствол скважины</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="w-4 h-4 bg-[#ef4444] opacity-70 rounded" />
+                      <span className="text-muted-foreground">Заряды ВВ</span>
+                    </div>
+                  </div>
+
+                  {isExploding && (
+                    <div className="mt-4">
+                      <div className="flex justify-between text-sm text-muted-foreground mb-2">
+                        <span>Прогресс взрыва</span>
+                        <span>{((currentDelay / (Math.max(...wells.map(w => w.delay)) + 1000)) * 100).toFixed(0)}%</span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                        <div 
+                          className="bg-accent h-full transition-all duration-100"
+                          style={{ 
+                            width: `${Math.min(100, (currentDelay / (Math.max(...wells.map(w => w.delay)) + 1000)) * 100)}%`
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             </Card>
 
             <Card className="p-6 bg-card border-border">
